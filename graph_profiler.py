@@ -1,12 +1,16 @@
-from collections import defaultdict
 import timeit
+from collections import defaultdict
+from functools import partial, update_wrapper
 
+import numpy as np
+import matplotlib.pyplot as plt
 from memory_profiler import memory_usage, profile
 
 
 class GraphProfiler:
-    def __init__(self, x_range=(30, 70, 30), number=10000, gc_enable=False):
+    def __init__(self, x_range=(10, 110, 10), repeat=3, number=10000, gc_enable=False):
         self.x_range = x_range
+        self.repeat = repeat
         self.number = number
         self.gc_enable = gc_enable
         self.functions = []
@@ -18,21 +22,39 @@ class GraphProfiler:
             t = timeit.Timer(function, 'gc.enable()')
         
         try:
-            measurement = t.timeit(self.number)
+            measurement = t.repeat(repeat=self.repeat, number=self.number)
         except:
             t.print_exc()
 
-        return measurement
+        return np.mean(measurement)
 
-    def memory_usage(self, func):
+    @staticmethod
+    def memory_usage(func):
         memory = memory_usage(func)
         return max(memory)
 
-    def graph(self, time_measure, memory_usage=None):
-        pass
-    
-    def wrapped_partial(self, func, *args, **kwargs):
-        print('func: ', func)
+    def graph(self, time_performance, memory_usage):
+        t = list(range(*self.x_range))
+        *_, step = self.x_range 
+        
+        plt.subplot(2, 1, 1)
+        for key, value in time_performance.items():
+            plt.plot(t, value, label=key)
+        plt.xticks(np.arange(min(t), max(t) + 1, float(step)))
+        plt.ylabel('Time [s]')
+        plt.legend(loc='lower right')
+
+        plt.subplot(2, 1, 2)
+        for key, value in memory_usage.items():
+            plt.plot(t, value, label=key) 
+        plt.xticks(np.arange(min(t), max(t) + 1, float(step)))
+        plt.ylabel('Memory usage [MiB]')
+        plt.legend(loc='lower right')
+ 
+        plt.show()
+   
+    @staticmethod
+    def wrapped_partial(func, *args, **kwargs):
         partial_func = partial(func, *args, **kwargs)
         update_wrapper(partial_func, func)
         return partial_func
@@ -47,23 +69,15 @@ class GraphProfiler:
 
     def run(self):
         time_performance = defaultdict(list)
-        memory_usage = defaultdict(set)
+        memory_usage = defaultdict(list)
         for function in self.functions:
             time_performance[str(function.__name__)].append(self.time_measure(function))
-            memory_usage[str(function.__name__)].add(self.memory_usage(function))
-
-        from pprint import pprint
-        pprint(time_performance)
-        pprint(memory_usage)
-
-        return time_performance
-
+            memory_usage[str(function.__name__)].append(self.memory_usage(function))
+        self.graph(time_performance=time_performance, memory_usage=memory_usage)
 
 if __name__ == "__main__":
-    
-    from functools import partial, update_wrapper
+    import datetime
 
-   
     def list_comp(n):
         ''.join([str(i) for i in range(n)])
 
@@ -75,8 +89,6 @@ if __name__ == "__main__":
 
     def foo():
         return True
-
-    import datetime
 
     def date_strptime(n):
         dt = '2018-12-12'
@@ -91,8 +103,9 @@ if __name__ == "__main__":
             datetime.datetime(int(y), int(m), int(d))
             n -= 1
     
-    gp = GraphProfiler()
-    gp.prepare_funcs([foo, date_strptime, date_ymd_parser])
+    gp = GraphProfiler(x_range=(20,230,20))
+    gp.prepare_funcs([list_comp, join1, join2])
+#    gp.prepare_funcs([date_strptime, date_ymd_parser])
     gp.run()
 
 

@@ -7,6 +7,8 @@ verify_ssl = true
 
 [packages]
 memory-profiler = "*"
+numpy = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.7"
