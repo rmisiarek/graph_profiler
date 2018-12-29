@@ -1,5 +1,7 @@
 import timeit
+import typing
 from collections import defaultdict
+from dataclasses import dataclass, field
 from functools import partial, update_wrapper
 
 import numpy as np
@@ -7,19 +9,19 @@ import matplotlib.pyplot as plt
 from memory_profiler import memory_usage, profile
 
 
+@dataclass
 class GraphProfiler:
-    def __init__(self, x_range=(10, 110, 10), repeat=3, number=10000, gc_enable=False):
-        self.x_range = x_range
-        self.repeat = repeat
-        self.number = number
-        self.gc_enable = gc_enable
-        self.functions = []
+    x_range: tuple = field(default=(10,110,10))
+    repeat: int = field(default=3)
+    number: int = field(default=1000000)
+    gc_enable: bool = field(default=False)
+    functions: list = field(default_factory=list, init=False)
 
     def time_measure(self, function):
         if self.gc_enable:
-            t = timeit.Timer(function)
-        else:
             t = timeit.Timer(function, 'gc.enable()')
+        else:
+            t = timeit.Timer(function)
         
         try:
             measurement = t.repeat(repeat=self.repeat, number=self.number)
@@ -60,6 +62,7 @@ class GraphProfiler:
         return partial_func
     
     def prepare_funcs(self, funcs, *args, **kwargs):
+        self.functions = []
         for func in funcs:
             for i in range(*self.x_range):
                 if func.__code__.co_argcount == 0:
@@ -74,38 +77,4 @@ class GraphProfiler:
             time_performance[str(function.__name__)].append(self.time_measure(function))
             memory_usage[str(function.__name__)].append(self.memory_usage(function))
         self.graph(time_performance=time_performance, memory_usage=memory_usage)
-
-if __name__ == "__main__":
-    import datetime
-
-    def list_comp(n):
-        ''.join([str(i) for i in range(n)])
-
-    def join1(n):
-        ''.join(str(i) for i in range(n))
-
-    def join2(n):
-        ''.join(map(str, range(n)))
-
-    def foo():
-        return True
-
-    def date_strptime(n):
-        dt = '2018-12-12'
-        while n > 0:
-            datetime.datetime.strptime(dt, '%Y-%m-%d')
-            n -= 1
-
-    def date_ymd_parser(n):
-        dt = '2018-12-12'
-        while n > 0:
-            y, m, d = dt.split('-')
-            datetime.datetime(int(y), int(m), int(d))
-            n -= 1
-    
-    gp = GraphProfiler(x_range=(20,230,20))
-    gp.prepare_funcs([list_comp, join1, join2])
-#    gp.prepare_funcs([date_strptime, date_ymd_parser])
-    gp.run()
-
 
