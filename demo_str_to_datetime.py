@@ -15,7 +15,7 @@ def date_ymd_parser(n):
         datetime.datetime(int(y), int(m), int(d))
         n -= 1
     
-gp = GraphProfiler(x_range=(30,100,30), repeat=1, number=10000)
+gp = GraphProfiler(range_=(30,100,30))
 gp.prepare_funcs([
     date_strptime,
     date_ymd_parser

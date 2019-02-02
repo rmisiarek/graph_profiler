@@ -1,19 +1,17 @@
-import timeit
-import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import partial, update_wrapper
+import timeit
 
 import numpy as np
 import matplotlib.pyplot as plt
-from memory_profiler import memory_usage, profile
 
 
 @dataclass
 class GraphProfiler:
-    x_range: tuple = field(default=(10,110,10))
+    range_: tuple = field(default=(10,110,10))
     repeat: int = field(default=3)
-    number: int = field(default=1000000)
+    number: int = field(default=10000)
     gc_enable: bool = field(default=False)
     functions: list = field(default_factory=list, init=False)
 
@@ -30,29 +28,25 @@ class GraphProfiler:
 
         return np.mean(measurement)
 
-    @staticmethod
-    def memory_usage(func):
-        memory = memory_usage(func)
-        return max(memory)
-
-    def graph(self, time_performance, memory_usage):
-        t = list(range(*self.x_range))
-        *_, step = self.x_range 
+    def graph(self, time_performance, time_diff=None):
+        t = list(range(*self.range_))
+        *_, step = self.range_ 
         
         plt.subplot(2, 1, 1)
         for key, value in time_performance.items():
             plt.plot(t, value, label=key)
         plt.xticks(np.arange(min(t), max(t) + 1, float(step)))
-        plt.ylabel('Time [s]')
-        plt.legend(loc='lower right')
+        plt.ylabel('Execution time [s]')
+        plt.legend(loc='best')
 
-        plt.subplot(2, 1, 2)
-        for key, value in memory_usage.items():
-            plt.plot(t, value, label=key) 
-        plt.xticks(np.arange(min(t), max(t) + 1, float(step)))
-        plt.ylabel('Memory usage [MiB]')
-        plt.legend(loc='lower right')
- 
+        if time_diff:
+            plt.subplot(2, 1, 2)
+            y_pos = np.arange(len(time_diff))
+            plt.bar(y_pos, time_diff, align='center')
+            plt.ylabel('Time difference [s]')
+            frame = plt.gca()     
+            frame.axes.get_xaxis().set_visible(False)
+  
         plt.show()
    
     @staticmethod
@@ -64,17 +58,23 @@ class GraphProfiler:
     def prepare_funcs(self, funcs, *args, **kwargs):
         self.functions = []
         for func in funcs:
-            for i in range(*self.x_range):
+            for i in range(*self.range_):
                 if func.__code__.co_argcount == 0:
                     self.functions.append(func)
                 else:
-                    self.functions.append(self.wrapped_partial(func, i, *args, **kwargs))
+                    self.functions.append(self.wrapped_partial(func, i))
 
     def run(self):
         time_performance = defaultdict(list)
         memory_usage = defaultdict(list)
         for function in self.functions:
             time_performance[str(function.__name__)].append(self.time_measure(function))
-            memory_usage[str(function.__name__)].append(self.memory_usage(function))
-        self.graph(time_performance=time_performance, memory_usage=memory_usage)
 
+        if len(time_performance) == 2:
+            diff = []
+            perf = list(time_performance.values())
+            for t in zip(perf[0], perf[1]):
+                diff.append(max(t[0], t[1]) - min(t[0], t[1]))
+            self.graph(time_performance=time_performance, time_diff=diff)
+        else:
+            self.graph(time_performance=time_performance)
